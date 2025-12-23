@@ -1,0 +1,52 @@
+name: Deploy postcode-mcp
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: /srv/postcode-mcp
+      SERVICE_NAME: postcode-mcp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync repository to server
+        run: |
+          rsync -az --delete \
+            --exclude '.git' \
+            ./ \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${APP_DIR}"
+
+      - name: Remote deploy (uv sync + restart)
+        run: |
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'EOF'
+          set -e
+
+          cd "${APP_DIR}"
+
+          # Python/uv 설치는 사전에 되어 있다고 가정
+          uv sync --all-extras --frozen
+
+          # systemd --user 서비스 재시작 (예: postcode-mcp.service)
+          systemctl --user daemon-reload || true
+          systemctl --user restart "${SERVICE_NAME}.service"
+
+          EOF
+
