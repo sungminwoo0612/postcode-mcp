@@ -109,7 +109,7 @@ fastmcp run
 
 HTTP (PlayMCP/외부 연동 권장):
 ```bash
-fastmcp run --transport http --host 0.0.0.0 --port 8000
+fastmcp run --transport http --host 0.0.0.0 --port 3334
 # MCP endpoint: http://localhost:8000/mcp
 ```
 
