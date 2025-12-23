@@ -24,4 +24,8 @@ except Exception as e:
 
 if __name__ == "__main__":
     # default: STDIO (FastMCP 문서상 run() 기본)
-    mcp.run()
+    mcp.run(
+        transport="http",
+        host="0.0.0.0",
+        port=3334,
+    )
