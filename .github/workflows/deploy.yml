@@ -2,15 +2,14 @@ name: Deploy postcode-mcp
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      APP_DIR: /srv/postcode-mcp
+      APP_DIR: /home/ec2-user/postcode-mcp
       SERVICE_NAME: postcode-mcp
 
     steps:
@@ -27,26 +26,38 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Prepare remote directory
+        run: |
+          ssh "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "mkdir -p '${APP_DIR}'"
+
       - name: Sync repository to server
         run: |
           rsync -az --delete \
             --exclude '.git' \
+            --exclude '.env' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude '*.log' \
             ./ \
             "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${APP_DIR}"
 
       - name: Remote deploy (uv sync + restart)
         run: |
           ssh "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
-          set -e
+          set -euo pipefail
 
-          cd "${APP_DIR}"
+          APP_DIR="/home/ec2-user/postcode-mcp"
+          SERVICE_NAME="postcode-mcp"
 
-          # Python/uv 설치는 사전에 되어 있다고 가정
+          cd "$APP_DIR"
+
+          # uv PATH 보정 (uv가 ~/.local/bin에 설치된 경우 대비)
+          export PATH="$HOME/.local/bin:$PATH"
+
           uv sync --all-extras --frozen
 
-          # systemd --user 서비스 재시작 (예: postcode-mcp.service)
-          systemctl --user daemon-reload || true
-          systemctl --user restart "${SERVICE_NAME}.service"
-
+          # systemd(system) 재기동
+          sudo systemctl daemon-reload
+          sudo systemctl restart "$SERVICE_NAME"
+          sudo systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,80p'
           EOF
-
