@@ -26,7 +26,7 @@ if __name__ == "__main__":
     # default: STDIO (FastMCP 문서상 run() 기본)
     mcp.run(
         transport="http",
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=3334,
         path="/mcp",
     )
